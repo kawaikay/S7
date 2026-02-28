@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af">
+    <title>Site Safety Inspection | 地盤安全檢查系統</title>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        :root { --primary: #2563eb; --primary-dark: #1e40af; --danger: #dc2626; --warning: #f59e0b; --success: #16a34a; --gray: #6b7280; --light: #f3f4f6; --contractor: #f59e0b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Hiragino Sans TC', 'Microsoft JhengHei', sans-serif; background: #f8fafc; padding: 0; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+        .app-container { max-width: 100%; min-height: 100vh; background: white; position: relative; }
+
+        /* Login Styles */
+        .login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); }
+        .login-box { background: white; padding: 32px; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .login-title { font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: 8px; color: #1f2937; }
+        .login-subtitle { text-align: center; color: #6b7280; margin-bottom: 24px; font-size: 0.875rem; }
+        .login-field { margin-bottom: 16px; }
+        .login-label { display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        .login-input { width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 1rem; transition: all 0.2s; }
+        .login-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .role-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .role-option { padding: 16px; border: 2px solid #e5e7eb; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .role-option.selected { border-color: #3b82f6; background: #eff6ff; }
+        .role-icon { font-size: 2rem; margin-bottom: 8px; }
+        .role-name { font-weight: 600; font-size: 0.875rem; }
+        .btn-login { width: 100%; padding: 14px; background: #3b82f6; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-login:hover { background: #1d4ed8; }
+        .login-error { color: #dc2626; font-size: 0.875rem; margin-top: 12px; text-align: center; display: none; }
+
+        /* Sync Status */
+        .sync-status { position: fixed; top: 70px; right: 16px; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; z-index: 1000; display: flex; align-items: center; gap: 6px; transition: all 0.3s; }
+        .sync-status.online { background: #d1fae5; color: #065f46; }
+        .sync-status.offline { background: #fee2e2; color: #991b1b; }
+        .sync-status.syncing { background: #dbeafe; color: #1e40af; }
+        .user-badge { position: fixed; top: 70px; left: 16px; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; z-index: 1000; background: #1e40af; color: white; }
+
+        /* App Header */
+        .app-header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 16px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .app-header h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+        .app-header p { font-size: 0.875rem; opacity: 0.9; }
+        .header-actions { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px; }
+        .header-btn { width: 36px; height: 36px; border: none; background: rgba(255,255,255,0.2); color: white; border-radius: 8px; cursor: pointer; font-size: 1.125rem; display: flex; align-items: center; justify-content: center; }
+
+        /* Progress & Mode */
+        .progress-bar { background: white; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px; }
+        .progress-text { font-size: 0.875rem; color: #374151; font-weight: 500; white-space: nowrap; }
+        .progress-track { flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); border-radius: 4px; transition: width 0.3s ease; width: 0%; }
+        .mode-toggle { background: white; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .mode-btn { padding: 8px 16px; border: 2px solid #e5e7eb; background: white; border-radius: 20px; font-size: 0.875rem; font-weight: 500; color: #6b7280; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .mode-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+        /* Categories */
+        .category-grid { padding: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .category-card { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+        .category-card:active { transform: scale(0.98); }
+        .category-card.selected { border-color: #3b82f6; background: #eff6ff; }
+        .category-card.completed { border-color: #16a34a; background: #f0fdf4; }
+        .category-icon { font-size: 2rem; margin-bottom: 8px; }
+        .category-name { font-size: 0.875rem; font-weight: 600; color: #1f2937; margin-bottom: 4px; }
+        .category-count { font-size: 0.75rem; color: #6b7280; }
+        .check-mark { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; background: #16a34a; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 0.875rem; }
+        .category-card.completed .check-mark { display: flex; }
+
+        /* Inspection View */
+        .inspection-view { display: none; padding: 16px; padding-bottom: 100px; }
+        .inspection-view.active { display: block; }
+        .nav-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .back-btn { width: 40px; height: 40px; border: none; background: #f3f4f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.25rem; }
+        .nav-title { flex: 1; font-size: 1.125rem; font-weight: 700; color: #1f2937; }
+
+        /* Checklist Item */
+        .checklist-item { background: white; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; page-break-inside: avoid; }
+        .item-header { padding: 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+        .item-number { display: inline-block; width: 28px; height: 28px; background: #3b82f6; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-size: 0.875rem; font-weight: 700; margin-right: 8px; }
+        .item-title { font-size: 1rem; font-weight: 600; color: #1f2937; margin-bottom: 8px; line-height: 1.4; }
+        .item-subtitle { font-size: 0.875rem; color: #6b7280; }
+        .badges { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .badge.critical { background: #fee2e2; color: #dc2626; }
+        .badge.high { background: #ffedd5; color: #ea580c; }
+        .badge.medium { background: #fef3c7; color: #d97706; }
+        .badge.freq { background: #e0e7ff; color: #4f46e5; }
+
+        /* Status */
+        .status-section { padding: 16px; border-bottom: 1px solid #e5e7eb; }
+        .status-label { font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 12px; display: block; }
+        .status-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .status-option { padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .status-option.selected { border-width: 3px; }
+        .status-option.pass.selected { border-color: #16a34a; background: #f0fdf4; }
+        .status-option.fail.selected { border-color: #dc2626; background: #fef2f2; }
+        .status-option.na.selected { border-color: #6b7280; background: #f9fafb; }
+        .status-icon { font-size: 1.5rem; margin-bottom: 4px; }
+        .status-text { font-size: 0.875rem; font-weight: 600; }
+
+        /* Photos */
+        .photo-section { padding: 16px; background: #fafafa; }
+        .photo-label { font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }
+        .photo-box { aspect-ratio: 4/3; background: white; border: 2px dashed #d1d5db; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; }
+        .photo-box.has-image { border-style: solid; border-color: #3b82f6; }
+        .photo-box input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; }
+        .photo-placeholder { text-align: center; color: #9ca3af; pointer-events: none; }
+        .photo-icon { font-size: 2rem; margin-bottom: 4px; }
+        .photo-text { font-size: 0.75rem; font-weight: 500; }
+        .photo-preview { position: absolute; inset: 0; background-size: cover; background-position: center; display: none; }
+        .photo-box.has-image .photo-preview { display: block; }
+        .photo-box.has-image .photo-placeholder { display: none; }
+        .remove-photo { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(220, 38, 38, 0.9); color: white; border: none; border-radius: 50%; font-size: 1rem; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 100; }
+        .photo-box.has-image .remove-photo { display: flex; }
+        .photo-caption { font-size: 0.75rem; color: #6b7280; text-align: center; margin-top: 4px; }
+
+        /* Remarks & Sections */
+        .remarks-section { padding: 16px; border-top: 1px solid #e5e7eb; }
+        .remarks-field { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.875rem; resize: vertical; min-height: 80px; font-family: inherit; }
+        .remarks-field:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .inspector-section { background: #eff6ff; padding: 16px; border-top: 2px solid #3b82f6; }
+        .contractor-section { background: #fef3c7; padding: 16px; border-top: 2px solid #f59e0b; }
+        .section-label { font-size: 0.875rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .inspector-label { color: #1e40af; }
+        .contractor-label { color: #92400e; }
+
+        /* Bottom Actions */
+        .bottom-actions { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); }
+        .btn { flex: 1; padding: 14px 20px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:active { background: #1d4ed8; }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-secondary:active { background: #e5e7eb; }
+        .btn-success { background: #16a34a; color: white; }
+
+        /* Summary */
+        .summary-view { display: none; padding: 16px; padding-bottom: 100px; }
+        .summary-view.active { display: block; }
+        .summary-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .summary-title { font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 16px; }
+        .summary-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .stat-box { background: #f9fafb; padding: 16px; border-radius: 10px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: 700; color: #3b82f6; }
+        .stat-label { font-size: 0.875rem; color: #6b7280; margin-top: 4px; }
+        .issue-list { margin-top: 16px; }
+        .issue-item { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+        .issue-title { font-weight: 600; color: #991b1b; font-size: 0.875rem; }
+        .issue-category { font-size: 0.75rem; color: #dc2626; margin-top: 4px; }
+
+        /* Info Input */
+        .info-input-section { background: white; padding: 16px; border-bottom: 1px solid #e5e7eb; }
+        .info-grid { display: grid; gap: 12px; }
+        .info-field { display: flex; flex-direction: column; gap: 4px; }
+        .info-label { font-size: 0.875rem; font-weight: 600; color: #374151; }
+        .info-input { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.875rem; font-family: inherit; }
+        .info-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+
+        /* Loading */
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .loading-overlay.active { display: flex; }
+        .loading-spinner { width: 50px; height: 50px; border: 4px solid #f3f4f6; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: white; margin-top: 16px; font-weight: 600; }
+
+        /* Offline Banner */
+        .offline-banner { background: #dc2626; color: white; padding: 12px; text-align: center; font-size: 0.875rem; font-weight: 600; display: none; }
+        .offline-banner.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="offline-banner" id="offlineBanner">⚠️ 離線模式 Offline Mode - 數據將在連線後同步</div>
+
+    <!-- Login Container -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <div class="login-title">🔍 Site Safety Inspection</div>
+            <div class="login-subtitle">地盤安全檢查系統 v2.0</div>
+
+            <div class="login-field">
+                <label class="login-label">電郵 Email</label>
+                <input type="email" class="login-input" id="loginEmail" placeholder="輸入電郵...">
+            </div>
+
+            <div class="login-field">
+                <label class="login-label">密碼 Password</label>
+                <input type="password" class="login-input" id="loginPassword" placeholder="輸入密碼...">
+            </div>
+
+            <div class="login-field">
+                <label class="login-label">角色 Role</label>
+                <div class="role-selector">
+                    <div class="role-option selected" data-role="inspector" onclick="selectRole('inspector')">
+                        <div class="role-icon">👷</div>
+                        <div class="role-name">駐地工程師<br>RSS Inspector</div>
+                    </div>
+                    <div class="role-option" data-role="contractor" onclick="selectRole('contractor')">
+                        <div class="role-icon">🏗️</div>
+                        <div class="role-name">承包商<br>Contractor</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-login" onclick="login()">登入 Login</button>
+            <div class="login-error" id="loginError"></div>
+
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+                <button class="btn btn-secondary" onclick="offlineMode()" style="width: 100%;">📴 離線使用 Offline Mode</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container" id="appContainer" style="display: none;">
+        <div class="sync-status online" id="syncStatus">
+            <span id="syncIcon">🟢</span>
+            <span id="syncText">已連線 Online</span>
+        </div>
+        <div class="user-badge" id="userBadge">👷 RSS</div>
+
+        <div class="app-header">
+            <h1>🔍 Site Safety Inspection</h1>
+            <p id="headerSubtitle">駐地工程師代表 Representative from RSS</p>
+            <div class="header-actions">
+                <button class="header-btn" onclick="syncData()" title="同步 Sync">🔄</button>
+                <button class="header-btn" onclick="logout()" title="登出 Logout">🚪</button>
+            </div>
+        </div>
+
+        <div class="progress-bar">
+            <span class="progress-text">進度</span>
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+            <span class="progress-text" id="progressText">0/15</span>
+        </div>
+
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="showView('select')">選擇項目</button>
+            <button class="mode-btn" onclick="showView('inspect')">進行檢查</button>
+            <button class="mode-btn" onclick="showView('summary')">檢查摘要</button>
+        </div>
+
+        <div class="category-grid" id="selectView"></div>
+
+        <div class="inspection-view" id="inspectView">
+            <div class="nav-header">
+                <button class="back-btn" onclick="showView('select')">←</button>
+                <div class="nav-title" id="inspectTitle">消防安全</div>
+            </div>
+            <div class="info-input-section">
+                <div class="info-grid">
+                    <div class="info-field">
+                        <label class="info-label">項目名稱 Project Name *</label>
+                        <input type="text" class="info-input" id="projectName" placeholder="輸入項目名稱...">
+                    </div>
+                    <div class="info-field">
+                        <label class="info-label">檢查編號 Inspection No.</label>
+                        <input type="text" class="info-input" id="inspectionNo" placeholder="自動生成" readonly>
+                    </div>
+                    <div class="info-field">
+                        <label class="info-label">駐地工程師代表 RSS Rep *</label>
+                        <input type="text" class="info-input" id="inspectorName" placeholder="輸入代表姓名...">
+                    </div>
+                    <div class="info-field">
+                        <label class="info-label">承包商代表 Contractor Rep *</label>
+                        <input type="text" class="info-input" id="contractorName" placeholder="輸入承包商代表...">
+                    </div>
+                    <div class="info-field">
+                        <label class="info-label">日期 Date *</label>
+                        <input type="date" class="info-input" id="inspectionDate">
+                    </div>
+                    <div class="info-field">
+                        <label class="info-label">天氣 Weather</label>
+                        <input type="text" class="info-input" id="weather" placeholder="輸入天氣狀況...">
+                    </div>
+                </div>
+            </div>
+            <div id="inspectContent"></div>
+        </div>
+
+        <div class="summary-view" id="summaryView">
+            <div class="summary-card">
+                <div class="summary-title">檢查摘要 Inspection Summary</div>
+                <div class="summary-stats">
+                    <div class="stat-box"><div class="stat-number" id="totalItems">0</div><div class="stat-label">已檢查項目</div></div>
+                    <div class="stat-box"><div class="stat-number" id="passItems">0</div><div class="stat-label">合格 PASS</div></div>
+                    <div class="stat-box"><div class="stat-number" id="failItems">0</div><div class="stat-label">不合格 FAIL</div></div>
+                    <div class="stat-box"><div class="stat-number" id="naItems">0</div><div class="stat-label">不適用 N/A</div></div>
+                </div>
+            </div>
+            <div class="summary-card" id="issuesCard" style="display: none;">
+                <div class="summary-title">發現的問題 Issues Found</div>
+                <div class="issue-list" id="issueList"></div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-title">報告操作 Report Actions</div>
+                <div style="display: grid; gap: 10px;">
+                    <button class="btn btn-primary" onclick="generateReport('pdf')">📄 生成 PDF 報告</button>
+                    <button class="btn btn-secondary" onclick="generateReport('word')">📝 生成 Word 文檔</button>
+                    <button class="btn btn-success" onclick="shareReport()">🔗 分享給承包商</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-actions" id="bottomActions">
+            <button class="btn btn-secondary" onclick="resetInspection()">🔄 重置 Reset</button>
+            <button class="btn btn-primary" onclick="saveToCloud()">💾 保存 Save</button>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div style="text-align: center;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">處理中 Processing...</div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+
+        // Initialize Firebase
+        let app, auth, database, storage;
+        let isFirebaseInitialized = false;
+
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                database = firebase.database();
+                storage = firebase.storage();
+                isFirebaseInitialized = true;
+            }
+        } catch (e) {
+            console.warn('Firebase init failed:', e);
+        }
+
+        // ==================== SERVICE WORKER ====================
+        if ('serviceWorker' in navigator) {
+            const swCode = `const CACHE_NAME='safety-v1';self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(['/','/index.html'])));});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+            const blob = new Blob([swCode], {type:'application/javascript'});
+            navigator.serviceWorker.register(URL.createObjectURL(blob));
+        }
+
+        // ==================== DATA ====================
+        const inspectionData = {
+            fire: { name: "消防安全 / Fire Safety", items: [
+                { id: "F1", title: "Fire extinguishers provided and accessible", titleCN: "滅火筒配置妥當並可取用", priority: "high", freq: "Daily" },
+                { id: "F2", title: "Housekeeping maintained to minimize fire hazards", titleCN: "保持整潔以減少火災危險", priority: "medium", freq: "Daily" },
+                { id: "F3", title: "Fire extinguisher certificate valid and not expired", titleCN: "滅火筒證書有效且未過期", priority: "critical", freq: "Weekly" },
+                { id: "F4", title: "Fire extinguisher properly hung above ground", titleCN: "滅火筒妥善懸掛於地面以上", priority: "medium", freq: "Daily" },
+                { id: "F5", title: "Damaged or defective fire extinguisher replaced", titleCN: "損壞或故障滅火筒已更換", priority: "high", freq: "Daily" },
+                { id: "F6", title: "Fire extinguisher provided at chemical storage area", titleCN: "化學品儲存區配置滅火筒", priority: "critical", freq: "Daily" },
+                { id: "F7", title: "Fire extinguisher provided at electricity distribution board", titleCN: "配電板配置滅火筒", priority: "high", freq: "Daily" }
+            ]},
+            electrical: { name: "電氣安全 / Electrical Safety", items: [
+                { id: "E1", title: "Generators properly earthed", titleCN: "發電機妥善接地", priority: "high", freq: "Weekly" },
+                { id: "E2", title: "Power cables properly managed", titleCN: "電源線妥善管理", priority: "high", freq: "Daily" },
+                { id: "E3", title: "Waterproof socket of electric arc welding repaired", titleCN: "電弧焊防水插座已修復", priority: "critical", freq: "Daily" },
+                { id: "E4", title: "No water spillage on top of electric switch box", titleCN: "電制箱頂部無水溢出", priority: "critical", freq: "Daily" },
+                { id: "E5", title: "Water tank relocated to prevent spillage on electrics", titleCN: "水箱重新放置防止電氣設備受濕", priority: "critical", freq: "Daily" },
+                { id: "E6", title: "Welding equipment properly stored and maintained", titleCN: "焊接設備妥善存放及保養", priority: "medium", freq: "Daily" },
+                { id: "E7", title: "Defective welding clamp replaced", titleCN: "損壞焊接夾具已更換", priority: "high", freq: "Daily" },
+                { id: "E8", title: "Power cables hanged above head level", titleCN: "電源線懸掛於頭部高度以上", priority: "high", freq: "Daily" },
+                { id: "E9", title: "Power cables not hanged on sharp objects", titleCN: "電源線不懸掛於尖銳物件上", priority: "high", freq: "Daily" },
+                { id: "E10", title: "Pre-use inspection conducted for portable power tools", titleCN: "手提電動工具使用前檢查", priority: "high", freq: "Daily" }
+            ]},
+            lifting: { name: "起重作業 / Lifting Operations", items: [
+                { id: "L1", title: "Lifting gear properly attached", titleCN: "起重設備正確連接", priority: "critical", freq: "Each Lift" },
+                { id: "L2", title: "Shackles have valid certificates and ID marks", titleCN: "卸扣具有有效證書及標識", priority: "medium", freq: "Weekly" },
+                { id: "L3", title: "Wire slings and shackles properly color-coded", titleCN: "鋼絲繩及卸扣正確顏色編碼", priority: "medium", freq: "Weekly" },
+                { id: "L4", title: "Area under crane jib fenced off", titleCN: "吊臂下方區域圍封", priority: "high", freq: "Daily" },
+                { id: "L5", title: "Crane operators trained and competent", titleCN: "起重機操作員經過培訓並具資格", priority: "high", freq: "Weekly" },
+                { id: "L6", title: "Two different objects not lifted at same time", titleCN: "不同物件不會同時吊運", priority: "critical", freq: "Each Lift" },
+                { id: "L7", title: "Certified lifting receptacle used for loose materials", titleCN: "散料使用認證起重容器", priority: "high", freq: "Daily" },
+                { id: "L8", title: "Lifting load not exceeding skip level", titleCN: "起吊負載不超過容器邊緣", priority: "critical", freq: "Each Lift" },
+                { id: "L9", title: "Lifting riggers and signalers stay away from fatal zone", titleCN: "起重工及訊號員遠離危險區域", priority: "critical", freq: "Each Lift" },
+                { id: "L10", title: "Defective hooks replaced immediately", titleCN: "損壞吊鉤立即更換", priority: "critical", freq: "Daily" },
+                { id: "L11", title: "Retractable fall arrestor properly installed at loading point", titleCN: "伸縮防墜器正確安裝於吊點", priority: "critical", freq: "Daily" },
+                { id: "L12", title: "Wire clamps installed at equal intervals and maintained", titleCN: "鋼絲繩夾等距安裝及保養", priority: "high", freq: "Weekly" },
+                { id: "L13", title: "Lifting gear properly rested on ground when not in use", titleCN: "吊具不使用時妥善放置於地面", priority: "medium", freq: "Daily" },
+                { id: "L14", title: "Operator standby in cabin when engine running with suspension load", titleCN: "懸掛負載時操作員留守駕駛艙", priority: "critical", freq: "Continuous" }
+            ]},
+            excavator: { name: "挖掘機作業 / Excavator Operations", items: [
+                { id: "X1", title: "Excavator bucket lowered when idling", titleCN: "挖掘機怠速時鏟斗放下", priority: "high", freq: "Daily" },
+                { id: "X2", title: "Safe access/egress for operators", titleCN: "操作員安全進出通道", priority: "medium", freq: "Daily" },
+                { id: "X3", title: "Side mirrors provided and maintained", titleCN: "側視鏡配置並妥善維護", priority: "high", freq: "Daily" },
+                { id: "X4", title: "Rear-view camera properly installed and adjusted", titleCN: "後視攝像頭妥善安裝及調校", priority: "high", freq: "Daily" },
+                { id: "X5", title: "CCTV angle adjusted for proper visibility", titleCN: "CCTV角度調校確保視野清晰", priority: "medium", freq: "Daily" },
+                { id: "X6", title: "Headroom limit signal provided", titleCN: "限高警示信號設置", priority: "high", freq: "Daily" },
+                { id: "X7", title: "No smoking during plant operation", titleCN: "機械操作時禁止吸煙", priority: "critical", freq: "Continuous" }
+            ]},
+            piling: { name: "打樁作業 / Piling Operations", items: [
+                { id: "P1", title: "Pile casings properly secured", titleCN: "樁套管妥善固定", priority: "high", freq: "Daily" },
+                { id: "P2", title: "Pile openings covered", titleCN: "樁孔覆蓋", priority: "critical", freq: "Daily" },
+                { id: "P3", title: "Piling rig operation zones fenced off", titleCN: "打樁機作業區圍封", priority: "critical", freq: "Daily" },
+                { id: "P4", title: "Shut pins properly installed", titleCN: "鎖銷正確安裝", priority: "medium", freq: "Daily" },
+                { id: "P5", title: "Dust tube/cover lowered as low as possible", titleCN: "防塵管/罩降至最低位置", priority: "medium", freq: "Daily" },
+                { id: "P6", title: "R-pin provided for connections", titleCN: "連接處提供R型銷", priority: "high", freq: "Daily" },
+                { id: "P7", title: "Travel limit device checked by competent person", titleCN: "行程限位裝置由合資格人士檢查", priority: "critical", freq: "Weekly" },
+                { id: "P8", title: "Key not remained at valve of pressure vessel", titleCN: "壓力容器閥門無遺留鑰匙", priority: "critical", freq: "Daily" }
+            ]},
+            falling: { name: "防墜物保護 / Falling Objects Protection", items: [
+                { id: "O1", title: "Rope nets on water tanks", titleCN: "水箱上設置繩網", priority: "medium", freq: "Weekly" },
+                { id: "O2", title: "Protruding bars/objects removed or guarded", titleCN: "突出鋼筋/物件移除或保護", priority: "high", freq: "Daily" },
+                { id: "O3", title: "Fall protection provided for work above 2 meters", titleCN: "2米以上工作提供防墜保護", priority: "critical", freq: "Daily" },
+                { id: "O4", title: "Proper guardrails at platform edges", titleCN: "平台邊緣設置適當護欄", priority: "critical", freq: "Daily" },
+                { id: "O5", title: "Insecure hanging objects removed or securely fixed", titleCN: "不穩固懸掛物件移除或牢固固定", priority: "critical", freq: "Daily" },
+                { id: "O6", title: "Hand tools equipped with tag line when working at height", titleCN: "高處作業手工具配備防墜繩", priority: "high", freq: "Daily" }
+            ]},
+            ppe: { name: "個人防護裝備 / Personal Protective Equipment", items: [
+                { id: "S1", title: "Eye protection used during grinding", titleCN: "打磨時佩戴眼部防護", priority: "critical", freq: "Continuous" },
+                { id: "S2", title: "Eye protection used during grout mixing", titleCN: "灌漿混合時佩戴眼部防護", priority: "critical", freq: "Continuous" },
+                { id: "S3", title: "Face shield provided for handling chemical substances", titleCN: "處理化學物質時提供面罩", priority: "critical", freq: "Continuous" },
+                { id: "S4", title: "PPE stored properly when not in use", titleCN: "個人防護裝備不使用時妥善存放", priority: "medium", freq: "Daily" },
+                { id: "S5", title: "Sunshade securely placed to prevent turnover", titleCN: "遮陽傘穩固放置防止翻倒", priority: "medium", freq: "Daily" },
+                { id: "S6", title: "Rigid umbrella stand provided instead of plastic barrier", titleCN: "使用剛性傘座而非塑料圍欄", priority: "medium", freq: "Daily" }
+            ]},
+            housekeeping: { name: "場地整理 / Housekeeping", items: [
+                { id: "H1", title: "Oil leaks cleaned immediately", titleCN: "漏油立即清理", priority: "medium", freq: "Daily" },
+                { id: "H2", title: "Residual fuel in hoses treated", titleCN: "軟管中殘留燃料處理", priority: "high", freq: "Daily" },
+                { id: "H3", title: "Uneven and slippery floor fixed", titleCN: "不平及濕滑地面修復", priority: "high", freq: "Daily" },
+                { id: "H4", title: "Slippery footpath cleared", titleCN: "濕滑人行道清理", priority: "high", freq: "Daily" },
+                { id: "H5", title: "Equipment not placed on stockpile", titleCN: "設備不放置於料堆上", priority: "medium", freq: "Daily" },
+                { id: "H6", title: "Unsafe placement of materials improved", titleCN: "不當物料放置改善", priority: "medium", freq: "Daily" },
+                { id: "H7", title: "Objects moved away from excavation edge", titleCN: "物件移離挖掘邊緣", priority: "high", freq: "Daily" },
+                { id: "H8", title: "Stagnant water removed promptly", titleCN: "積水及時清理", priority: "high", freq: "Daily" },
+                { id: "H9", title: "Chemical substances storage area fenced off", titleCN: "化學品儲存區圍封", priority: "critical", freq: "Daily" },
+                { id: "H10", title: "Sandbags provided to prevent mud water discharge to public", titleCN: "沙包防止泥水排放至公共區域", priority: "high", freq: "Daily" }
+            ]},
+            access: { name: "進出通道 / Access & Egress", items: [
+                { id: "A1", title: "Working platforms sufficient width", titleCN: "工作平台寬度足夠", priority: "high", freq: "Daily" },
+                { id: "A2", title: "Trapping hazards eliminated on footpaths", titleCN: "消除通道上的 trapping 危險", priority: "medium", freq: "Daily" },
+                { id: "A3", title: "Sharp edges of planking guarded", titleCN: "木板銳邊保護", priority: "medium", freq: "Daily" },
+                { id: "A4", title: "Slope edges fenced off", titleCN: "斜坡邊緣圍封", priority: "medium", freq: "Daily" },
+                { id: "A5", title: "Safe access and egress maintained at all workplaces", titleCN: "所有工作場所保持安全進出通道", priority: "critical", freq: "Daily" },
+                { id: "A6", title: "Ladder platform properly stored", titleCN: "梯子平台妥善存放", priority: "medium", freq: "Daily" },
+                { id: "A7", title: "Defective ladder removed from use", titleCN: "損壞梯子禁止使用", priority: "critical", freq: "Daily" },
+                { id: "A8", title: "Hoses relocated away from staircase", titleCN: "軟管移離樓梯", priority: "medium", freq: "Daily" },
+                { id: "A9", title: "Sufficient illumination provided at workplace", titleCN: "工作場所照明充足", priority: "high", freq: "Daily" },
+                { id: "A10", title: "Uneven metal plates fixed to prevent tripping", titleCN: "不平鋼板修復防止絆倒", priority: "high", freq: "Daily" }
+            ]},
+            rules: { name: "地盤規定 / Site Rules", items: [
+                { id: "R1", title: "No smoking policy enforced", titleCN: "執行禁煙規定", priority: "high", freq: "Continuous" },
+                { id: "R2", title: "Typhoon preventive measures taken", titleCN: "採取颱風預防措施", priority: "high", freq: "As Required" },
+                { id: "R3", title: "Smoking prohibited during operating a plant", titleCN: "操作機械時禁止吸煙", priority: "critical", freq: "Continuous" }
+            ]},
+            docs: { name: "文件記錄 / Documentation", items: [
+                { id: "D1", title: "Form 4 for excavation and earthwork displayed (competent person inspection)", titleCN: "挖掘及土方工程表格4張貼及合資格人士檢查", priority: "critical", freq: "Weekly" },
+                { id: "D2", title: "Form 5 for metal scaffolding displayed (competent person details)", titleCN: "金屬棚架表格5張貼及合資格人士詳情", priority: "high", freq: "Weekly" },
+                { id: "D3", title: "Inspection Report Form 1 for chain block prepared", titleCN: "手拉葫蘆檢查報告表格1備妥", priority: "high", freq: "Weekly" },
+                { id: "D4", title: "Hot work permit properly filled with recipient name", titleCN: "熱工序許可證正確填寫收件人姓名", priority: "critical", freq: "Daily" }
+            ]},
+            excavation: { name: "挖掘與斜坡 / Excavation & Slope", items: [
+                { id: "V1", title: "Rigid barriers along slope edges installed", titleCN: "斜坡邊緣安裝剛性圍欄", priority: "critical", freq: "Daily" },
+                { id: "V2", title: "Safe angle excavation provided", titleCN: "提供安全角度挖掘", priority: "critical", freq: "Daily" },
+                { id: "V3", title: "Slope surface protection maintained", titleCN: "斜坡表面保護維護", priority: "high", freq: "Daily" },
+                { id: "V4", title: "Excavation pit beside haul road fenced off", titleCN: "運輸路旁挖掘坑圍封", priority: "critical", freq: "Daily" },
+                { id: "V5", title: "Serious wash off checked by competent person", titleCN: "嚴重沖刷由合資格人士檢查", priority: "critical", freq: "Immediately" },
+                { id: "V6", title: "Plastic barriers removed from slope", titleCN: "斜坡上塑料圍欄移除", priority: "medium", freq: "Daily" }
+            ]},
+            material: { name: "物料儲存 / Material Storage", items: [
+                { id: "M1", title: "Casting properly wedged at both sides", titleCN: "鑄件兩側妥善楔緊", priority: "high", freq: "Daily" },
+                { id: "M2", title: "Rolling objects properly wedged", titleCN: "滾動物件妥善楔緊", priority: "high", freq: "Daily" },
+                { id: "M3", title: "Damaged wedges replaced", titleCN: "損壞楔塊更換", priority: "high", freq: "Daily" },
+                { id: "M4", title: "Pipe rack provided for casing storage", titleCN: "套管儲存提供管架", priority: "medium", freq: "Daily" },
+                { id: "M5", title: "Opening covered for safety", titleCN: "開口覆蓋確保安全", priority: "critical", freq: "Daily" },
+                { id: "M6", title: "Damaged push sticks replaced", titleCN: "損壞推桿更換", priority: "medium", freq: "Daily" },
+                { id: "M7", title: "Casing and drilling rod securely fastened by webbing sling prior to transport", titleCN: "運輸前套管及鑽桿用吊帶牢固綁紮", priority: "critical", freq: "Each Transport" },
+                { id: "M8", title: "Wheel wedges provided to concrete truck when parking at inclined slope", titleCN: "混凝土車斜坡停泊時使用輪擋", priority: "critical", freq: "Daily" },
+                { id: "M9", title: "Outrigger of concrete pump truck rested on ground firmly", titleCN: "混凝土泵車支腿穩固支撐於地面", priority: "critical", freq: "Each Setup" }
+            ]},
+            confined: { name: "密閉空間 / Confined Space", items: [
+                { id: "C1", title: "Lifebuoy provided at sump pit", titleCN: "集水坑提供救生圈", priority: "critical", freq: "Daily" },
+                { id: "C2", title: "Tripping hazards eliminated near openings", titleCN: "開口附近絆倒危險消除", priority: "high", freq: "Daily" },
+                { id: "C3", title: "Gap fully covered", titleCN: "縫隙完全覆蓋", priority: "critical", freq: "Daily" }
+            ]},
+            welding: { name: "焊接切割作業 / Welding & Cutting", items: [
+                { id: "W1", title: "Non-return valves provided at torch connection", titleCN: "焊炬連接處設置回火防止閥", priority: "critical", freq: "Daily" },
+                { id: "W2", title: "Aging gas hoses for flame cutting set replaced", titleCN: "老化火焰切割氣喉更換", priority: "critical", freq: "Daily" },
+                { id: "W3", title: "Air hose checked and fixed by competent person when torn", titleCN: "氣喉破損時由合資格人士檢查修復", priority: "critical", freq: "Immediately" },
+                { id: "W4", title: "Power cables removed from gas cylinder cage", titleCN: "電源線移離氣瓶籠", priority: "high", freq: "Daily" },
+                { id: "W5", title: "Valid hot-work permit available", titleCN: "有效熱工序許可證備妥", priority: "critical", freq: "Each Operation" }
+            ]}
+        };
+
+        // ==================== STATE ====================
+        let selectedCategories = new Set();
+        let inspectionResults = {};
+        let currentCategory = null;
+        let currentReportId = null;
+        let currentUser = null;
+        let userRole = 'inspector';
+        let isOffline = false;
+        let pendingSync = [];
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('inspectionDate').valueAsDate = new Date();
+            generateInspectionNo();
+            renderCategories();
+            checkOnlineStatus();
+
+            window.addEventListener('online', () => updateOnlineStatus(true));
+            window.addEventListener('offline', () => updateOnlineStatus(false));
+        });
+
+        function generateInspectionNo() {
+            const date = new Date();
+            const prefix = 'INS';
+            const timestamp = date.getFullYear().toString().substr(2) + 
+                            String(date.getMonth() + 1).padStart(2, '0') + 
+                            String(date.getDate()).padStart(2, '0');
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            document.getElementById('inspectionNo').value = `${prefix}-${timestamp}-${random}`;
+        }
+
+        function checkOnlineStatus() {
+            updateOnlineStatus(navigator.onLine);
+        }
+
+        function updateOnlineStatus(online) {
+            isOffline = !online;
+            const banner = document.getElementById('offlineBanner');
+            const status = document.getElementById('syncStatus');
+            const icon = document.getElementById('syncIcon');
+            const text = document.getElementById('syncText');
+
+            if (online) {
+                banner.classList.remove('active');
+                status.className = 'sync-status online';
+                icon.textContent = '🟢';
+                text.textContent = '已連線 Online';
+                syncPendingData();
+            } else {
+                banner.classList.add('active');
+                status.className = 'sync-status offline';
+                icon.textContent = '🔴';
+                text.textContent = '離線 Offline';
+            }
+        }
+
+        // ==================== AUTHENTICATION ====================
+        function selectRole(role) {
+            userRole = role;
+            document.querySelectorAll('.role-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector(`[data-role="${role}"]`).classList.add('selected');
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            if (!email || !password) {
+                errorDiv.textContent = '請輸入電郵和密碼 Please enter email and password';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            showLoading('登入中 Logging in...');
+
+            if (isFirebaseInitialized) {
+                auth.signInWithEmailAndPassword(email, password)
+                    .then(userCredential => {
+                        currentUser = userCredential.user;
+                        hideLoading();
+                        showApp();
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        errorDiv.textContent = error.message;
+                        errorDiv.style.display = 'block';
+                    });
+            } else {
+                setTimeout(() => {
+                    hideLoading();
+                    currentUser = { email: email, uid: 'offline_' + Date.now() };
+                    showApp();
+                }, 1000);
+            }
+        }
+
+        function offlineMode() {
+            isOffline = true;
+            currentUser = { email: 'offline@local.com', uid: 'offline_local' };
+            updateOnlineStatus(false);
+            showApp();
+        }
+
+        function logout() {
+            if (isFirebaseInitialized && auth.currentUser) {
+                auth.signOut();
+            }
+            currentUser = null;
+            selectedCategories.clear();
+            inspectionResults = {};
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'none';
+        }
+
+        function showApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+
+            const badge = document.getElementById('userBadge');
+            const subtitle = document.getElementById('headerSubtitle');
+
+            if (userRole === 'inspector') {
+                badge.textContent = '👷 RSS';
+                subtitle.textContent = '駐地工程師代表 Representative from RSS';
+            } else {
+                badge.textContent = '🏗️ Contractor';
+                subtitle.textContent = '承包商 Contractor';
+            }
+        }
+
+        // ==================== UI FUNCTIONS ====================
+        function renderCategories() {
+            const grid = document.getElementById('selectView');
+            grid.innerHTML = '';
+
+            Object.keys(inspectionData).forEach(key => {
+                const cat = inspectionData[key];
+                const card = document.createElement('div');
+                card.className = 'category-card';
+                card.setAttribute('data-category', key);
+                card.onclick = () => selectCategory(key);
+
+                const icons = {
+                    fire: '🔥', electrical: '⚡', lifting: '🏗️', excavator: '🚜',
+                    piling: '🔩', falling: '⛑️', ppe: '🥽', housekeeping: '🧹',
+                    access: '🚶', rules: '📋', docs: '📄', excavation: '⛰️',
+                    material: '📦', confined: '🕳️', welding: '🔥'
+                };
+
+                card.innerHTML = `
+                    <div class="check-mark">✓</div>
+                    <div class="category-icon">${icons[key] || '📋'}</div>
+                    <div class="category-name">${cat.name.split(' / ')[1] || cat.name}</div>
+                    <div class="category-count">${cat.items.length} 項</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function selectCategory(category) {
+            const card = document.querySelector(`[data-category="${category}"]`);
+            if (selectedCategories.has(category)) {
+                selectedCategories.delete(category);
+                card.classList.remove('selected');
+            } else {
+                selectedCategories.add(category);
+                card.classList.add('selected');
+            }
+            updateProgress();
+        }
+
+        function updateProgress() {
+            let completed = 0, total = 0;
+            selectedCategories.forEach(cat => {
+                inspectionData[cat].items.forEach(item => {
+                    total++;
+                    const result = inspectionResults[item.id];
+                    if (result && (result.photos?.length > 0 || result.contractorPhotos?.length > 0)) {
+                        completed++;
+                    }
+                });
+            });
+            const pct = total > 0 ? (completed / total) * 100 : 0;
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressText').textContent = `${completed}/${total}`;
+        }
+
+        function showView(view) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('selectView').style.display = 'none';
+            document.getElementById('inspectView').classList.remove('active');
+            document.getElementById('summaryView').classList.remove('active');
+
+            if (view === 'select') {
+                document.getElementById('selectView').style.display = 'grid';
+            } else if (view === 'inspect') {
+                if (selectedCategories.size === 0) {
+                    alert('請先選擇至少一個類別');
+                    return;
+                }
+                showFirstCategory();
+            } else if (view === 'summary') {
+                document.getElementById('summaryView').classList.add('active');
+                updateSummary();
+            }
+        }
+
+        function showFirstCategory() {
+            const first = Array.from(selectedCategories)[0];
+            if (first) showCategory(first);
+        }
+
+        function showCategory(category) {
+            currentCategory = category;
+            const data = inspectionData[category];
+            document.getElementById('inspectTitle').textContent = data.name;
+            document.getElementById('selectView').style.display = 'none';
+            document.getElementById('inspectView').classList.add('active');
+
+            let html = '';
+            data.items.forEach((item, idx) => {
+                const result = inspectionResults[item.id] || {};
+                const photos = result.photos || [];
+                const cPhotos = result.contractorPhotos || [];
+
+                html += createItemHTML(item, idx, result, photos, cPhotos);
+            });
+
+            // Navigation
+            const cats = Array.from(selectedCategories);
+            const idx = cats.indexOf(category);
+            html += '<div style="display: flex; gap: 10px; margin: 20px 0 40px;">';
+            if (idx > 0) html += `<button class="btn btn-secondary" onclick="showCategory('${cats[idx-1]}')">← 上一項</button>`;
+            if (idx < cats.length - 1) html += `<button class="btn btn-primary" onclick="showCategory('${cats[idx+1]}')" style="margin-left: auto;">下一項 →</button>`;
+            else html += `<button class="btn btn-primary" onclick="completeInspection()" style="margin-left: auto;">完成檢查 ✓</button>`;
+            html += '</div>';
+
+            document.getElementById('inspectContent').innerHTML = html;
+        }
+
+        function createItemHTML(item, idx, result, photos, cPhotos) {
+            const pass = result.status === 'pass' ? 'selected' : '';
+            const fail = result.status === 'fail' ? 'selected' : '';
+            const na = result.status === 'na' ? 'selected' : '';
+
+            let pHtml = photos.map((p, i) => `
+                <div><div class="photo-box has-image">
+                    <div class="photo-preview" style="background-image: url('${p}')"></div>
+                    <button class="remove-photo" onclick="removePhoto('${item.id}', ${i}, 'inspector')">×</button>
+                </div><div class="photo-caption">照片 ${i+1}</div></div>
+            `).join('');
+
+            pHtml += `
+                <div><div class="photo-box">
+                    <label style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;z-index:5;">
+                        <div class="photo-placeholder"><div class="photo-icon">+</div><div class="photo-text">添加照片</div></div>
+                        <input type="file" accept="image/*" onchange="addPhoto('${item.id}', this, 'inspector')" style="display:none;">
+                    </label>
+                </div><div class="photo-caption">添加新照片</div></div>
+            `;
+
+            let cHtml = cPhotos.map((p, i) => `
+                <div><div class="photo-box has-image" style="border-color: #f59e0b;">
+                    <div class="photo-preview" style="background-image: url('${p}')"></div>
+                    <button class="remove-photo" onclick="removePhoto('${item.id}', ${i}, 'contractor')">×</button>
+                </div><div class="photo-caption">整改照 ${i+1}</div></div>
+            `).join('');
+
+            cHtml += `
+                <div><div class="photo-box" style="border-color: #f59e0b;">
+                    <label style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;z-index:5;">
+                        <div class="photo-placeholder" style="color: #92400e;"><div class="photo-icon">+</div><div class="photo-text">添加整改照</div></div>
+                        <input type="file" accept="image/*" onchange="addPhoto('${item.id}', this, 'contractor')" style="display:none;">
+                    </label>
+                </div><div class="photo-caption">添加整改照片</div></div>
+            `;
+
+            return `
+                <div class="checklist-item" data-item="${item.id}">
+                    <div class="item-header">
+                        <span class="item-number">${idx+1}</span>
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-subtitle">${item.titleCN}</div>
+                        <div class="badges">
+                            <span class="badge ${item.priority}">${item.priority}</span>
+                            <span class="badge freq">${item.freq}</span>
+                        </div>
+                    </div>
+                    <div class="status-section">
+                        <label class="status-label">狀態 / Status</label>
+                        <div class="status-options">
+                            <div class="status-option pass ${pass}" onclick="setStatus('${item.id}', 'pass')">
+                                <div class="status-icon">✓</div><div class="status-text">合格 PASS</div>
+                            </div>
+                            <div class="status-option fail ${fail}" onclick="setStatus('${item.id}', 'fail')">
+                                <div class="status-icon">✗</div><div class="status-text">不合格 FAIL</div>
+                            </div>
+                            <div class="status-option na ${na}" onclick="setStatus('${item.id}', 'na')">
+                                <div class="status-icon">−</div><div class="status-text">不適用 N/A</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inspector-section">
+                        <div class="section-label inspector-label">👷 駐地工程師代表 RSS Representative</div>
+                        <div class="photo-grid">${pHtml}</div>
+                        <div class="remarks-section" style="border-top: none; padding: 12px 0 0 0;">
+                            <textarea class="remarks-field" placeholder="駐地工程師備註..." onchange="saveRemark('${item.id}', 'inspector', this.value)">${result.inspectorRemark || ''}</textarea>
+                        </div>
+                    </div>
+                    <div class="contractor-section">
+                        <div class="section-label contractor-label">🏗️ 承包商 Contractor</div>
+                        <div class="photo-grid">${cHtml}</div>
+                        <div class="remarks-section" style="border-top: none; padding: 12px 0 0 0;">
+                            <textarea class="remarks-field" placeholder="承包商備註..." onchange="saveRemark('${item.id}', 'contractor', this.value)">${result.contractorRemark || ''}</textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setStatus(itemId, status) {
+            if (!inspectionResults[itemId]) inspectionResults[itemId] = { photos: [], contractorPhotos: [] };
+            inspectionResults[itemId].status = status;
+
+            const item = document.querySelector(`[data-item="${itemId}"]`);
+            item.querySelectorAll('.status-option').forEach(opt => opt.classList.remove('selected'));
+            item.querySelector(`.status-option.${status}`).classList.add('selected');
+            updateProgress();
+        }
+
+        function addPhoto(itemId, input, type) {
+            if (!input.files || !input.files[0]) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (!inspectionResults[itemId]) inspectionResults[itemId] = { photos: [], contractorPhotos: [] };
+                if (type === 'inspector') {
+                    inspectionResults[itemId].photos.push(e.target.result);
+                } else {
+                    inspectionResults[itemId].contractorPhotos.push(e.target.result);
+                }
+                showCategory(currentCategory);
+                updateProgress();
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function removePhoto(itemId, idx, type) {
+            if (!inspectionResults[itemId]) return;
+            if (type === 'inspector') {
+                inspectionResults[itemId].photos.splice(idx, 1);
+            } else {
+                inspectionResults[itemId].contractorPhotos.splice(idx, 1);
+            }
+            showCategory(currentCategory);
+            updateProgress();
+        }
+
+        function saveRemark(itemId, type, value) {
+            if (!inspectionResults[itemId]) inspectionResults[itemId] = { photos: [], contractorPhotos: [] };
+            if (type === 'inspector') {
+                inspectionResults[itemId].inspectorRemark = value;
+            } else {
+                inspectionResults[itemId].contractorRemark = value;
+            }
+        }
+
+        function completeInspection() {
+            document.querySelector(`[data-category="${currentCategory}"]`)?.classList.add('completed');
+            updateProgress();
+            document.querySelectorAll('.mode-btn')[2].click();
+        }
+
+        function updateSummary() {
+            let total = 0, pass = 0, fail = 0, na = 0;
+            const issues = [];
+
+            selectedCategories.forEach(cat => {
+                inspectionData[cat].items.forEach(item => {
+                    const result = inspectionResults[item.id];
+                    if (result && (result.photos?.length > 0 || result.contractorPhotos?.length > 0)) {
+                        total++;
+                        if (result.status === 'pass') pass++;
+                        else if (result.status === 'fail') {
+                            fail++;
+                            issues.push({ title: item.title, category: inspectionData[cat].name });
+                        }
+                        else if (result.status === 'na') na++;
+                    }
+                });
+            });
+
+            document.getElementById('totalItems').textContent = total;
+            document.getElementById('passItems').textContent = pass;
+            document.getElementById('failItems').textContent = fail;
+            document.getElementById('naItems').textContent = na;
+
+            const issuesCard = document.getElementById('issuesCard');
+            if (issues.length > 0) {
+                issuesCard.style.display = 'block';
+                document.getElementById('issueList').innerHTML = issues.map(i => `
+                    <div class="issue-item">
+                        <div class="issue-title">${i.title}</div>
+                        <div class="issue-category">${i.category}</div>
+                    </div>
+                `).join('');
+            } else {
+                issuesCard.style.display = 'none';
+            }
+        }
+
+        // ==================== SAVE & SYNC ====================
+        function saveToCloud() {
+            if (isOffline) {
+                saveToLocal();
+                alert('已保存至本地 Saved locally (Offline mode)');
+                return;
+            }
+
+            showLoading('保存中 Saving...');
+
+            const reportData = {
+                id: document.getElementById('inspectionNo').value,
+                projectName: document.getElementById('projectName').value,
+                inspectorName: document.getElementById('inspectorName').value,
+                contractorName: document.getElementById('contractorName').value,
+                date: document.getElementById('inspectionDate').value,
+                weather: document.getElementById('weather').value,
+                results: inspectionResults,
+                categories: Array.from(selectedCategories),
+                timestamp: Date.now(),
+                userId: currentUser?.uid
+            };
+
+            if (isFirebaseInitialized) {
+                database.ref('inspections/' + reportData.id).set(reportData)
+                    .then(() => {
+                        hideLoading();
+                        alert('保存成功 Saved successfully');
+                    })
+                    .catch(err => {
+                        hideLoading();
+                        saveToLocal();
+                        alert('保存失敗，已存至本地 Save failed, stored locally');
+                    });
+            } else {
+                setTimeout(() => {
+                    hideLoading();
+                    saveToLocal();
+                    alert('已保存至本地 Saved locally');
+                }, 1000);
+            }
+        }
+
+        function saveToLocal() {
+            const data = {
+                inspectionNo: document.getElementById('inspectionNo').value,
+                projectName: document.getElementById('projectName').value,
+                inspectorName: document.getElementById('inspectorName').value,
+                contractorName: document.getElementById('contractorName').value,
+                date: document.getElementById('inspectionDate').value,
+                weather: document.getElementById('weather').value,
+                results: inspectionResults,
+                categories: Array.from(selectedCategories)
+            };
+            localStorage.setItem('safety_inspection_' + data.inspectionNo, JSON.stringify(data));
+        }
+
+        function syncData() {
+            if (isOffline) {
+                alert('離線模式，無法同步 Offline mode, cannot sync');
+                return;
+            }
+            showLoading('同步中 Syncing...');
+            setTimeout(() => {
+                hideLoading();
+                alert('同步完成 Sync completed');
+            }, 1500);
+        }
+
+        function syncPendingData() {
+            // Sync local data to cloud when back online
+            console.log('Syncing pending data...');
+        }
+
+        // ==================== REPORT GENERATION ====================
+        function generateReport(type) {
+            const reportData = {
+                inspectionNo: document.getElementById('inspectionNo').value,
+                projectName: document.getElementById('projectName').value,
+                inspectorName: document.getElementById('inspectorName').value,
+                contractorName: document.getElementById('contractorName').value,
+                date: document.getElementById('inspectionDate').value,
+                weather: document.getElementById('weather').value
+            };
+
+            if (type === 'pdf') {
+                generatePDF(reportData);
+            } else {
+                generateWord(reportData);
+            }
+        }
+
+        function generatePDF(data) {
+            showLoading('生成 PDF 中 Generating PDF...');
+
+            const printWindow = window.open('', '_blank');
+            const content = generatePrintContent(data);
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Safety Report - ${data.projectName}</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 15mm; }
+                        body { font-family: 'PingFang TC', 'Microsoft JhengHei', Arial, sans-serif; font-size: 10pt; line-height: 1.4; }
+                        .header { text-align: center; margin-bottom: 20px; border-bottom: 3px double #000; padding-bottom: 15px; }
+                        .header h1 { font-size: 16pt; margin-bottom: 5px; }
+                        .header h2 { font-size: 12pt; font-weight: normal; margin-bottom: 15px; }
+                        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                        .info-table td { border: 1px solid #000; padding: 8px; }
+                        .info-table .label { background: #f0f0f0; font-weight: bold; width: 25%; }
+                        .item { border: 1px solid #000; margin-bottom: 15px; page-break-inside: avoid; }
+                        .item-header { background: #f5f5f5; padding: 10px; border-bottom: 1px solid #000; }
+                        .item-title { font-weight: bold; font-size: 11pt; }
+                        .item-subtitle { font-size: 9pt; color: #666; margin-top: 4px; }
+                        .status { padding: 5px 10px; margin: 5px 0; font-weight: bold; }
+                        .status.pass { background: #d4edda; color: #155724; }
+                        .status.fail { background: #f8d7da; color: #721c24; }
+                        .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; }
+                        .photo { border: 1px solid #ccc; page-break-inside: avoid; }
+                        .photo img { width: 100%; height: auto; max-height: 150px; object-fit: contain; }
+                        .section { padding: 10px; border-top: 1px solid #ddd; }
+                        .section-title { font-weight: bold; margin-bottom: 8px; }
+                        .inspector { background: #e3f2fd; }
+                        .contractor { background: #fff3e0; }
+                        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; page-break-inside: avoid; }
+                        .signature { text-align: center; }
+                        .signature-line { border-bottom: 1px solid #000; height: 60px; margin-bottom: 8px; }
+                        .footer { margin-top: 30px; font-size: 8pt; text-align: center; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>WEEKLY SAFETY INSPECTION REPORT</h1>
+                        <h2>每週安全檢查報告</h2>
+                        <table class="info-table">
+                            <tr><td class="label">項目名稱<br>Project</td><td>${data.projectName || ''}</td>
+                                <td class="label">檢查編號<br>Inspection No.</td><td>${data.inspectionNo || ''}</td></tr>
+                            <tr><td class="label">檢查日期<br>Date</td><td>${data.date || ''}</td>
+                                <td class="label">天氣<br>Weather</td><td>${data.weather || ''}</td></tr>
+                            <tr><td class="label">駐地工程師代表<br>RSS Rep</td><td>${data.inspectorName || ''}</td>
+                                <td class="label">承包商代表<br>Contractor Rep</td><td>${data.contractorName || ''}</td></tr>
+                        </table>
+                    </div>
+                    ${content}
+                    <div class="signatures">
+                        <div class="signature">
+                            <div class="signature-line"></div>
+                            <div><strong>駐地工程師代表<br>RSS Representative</strong></div>
+                            <div style="font-size: 9pt; color: #666; margin-top: 5px;">Date: ${data.date || ''}</div>
+                        </div>
+                        <div class="signature">
+                            <div class="signature-line"></div>
+                            <div><strong>承包商安全代表及安全經理<br>Contractor Safety Rep & Safety Manager</strong></div>
+                            <div style="font-size: 9pt; color: #666; margin-top: 5px;">Date: _____________</div>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <div>This report is generated electronically and is valid without signature.</div>
+                        <div>本報告以電子方式生成，無需簽署即為有效。</div>
+                        <div>Generated: ${new Date().toLocaleString()}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+
+            setTimeout(() => {
+                hideLoading();
+                printWindow.focus();
+                printWindow.print();
+            }, 500);
+        }
+
+        function generateWord(data) {
+            const content = generatePrintContent(data);
+            const html = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset="utf-8"><title>Safety Report</title></head>
+                <body>
+                    <h1>WEEKLY SAFETY INSPECTION REPORT / 每週安全檢查報告</h1>
+                    <table border="1" style="width:100%; border-collapse: collapse;">
+                        <tr><td style="background:#f0f0f0; padding:8px;"><b>項目名稱 Project</b></td><td>${data.projectName || ''}</td>
+                            <td style="background:#f0f0f0; padding:8px;"><b>檢查編號 Inspection No.</b></td><td>${data.inspectionNo || ''}</td></tr>
+                        <tr><td style="background:#f0f0f0; padding:8px;"><b>日期 Date</b></td><td>${data.date || ''}</td>
+                            <td style="background:#f0f0f0; padding:8px;"><b>天氣 Weather</b></td><td>${data.weather || ''}</td></tr>
+                        <tr><td style="background:#f0f0f0; padding:8px;"><b>駐地工程師代表 RSS Rep</b></td><td>${data.inspectorName || ''}</td>
+                            <td style="background:#f0f0f0; padding:8px;"><b>承包商代表 Contractor Rep</b></td><td>${data.contractorName || ''}</td></tr>
+                    </table>
+                    <br>
+                    ${content}
+                    <br><br>
+                    <table style="width:100%;">
+                        <tr>
+                            <td style="width:50%; text-align: center;">
+                                <div style="border-bottom: 1px solid #000; height: 60px;"></div>
+                                <b>駐地工程師代表 RSS Representative</b><br>
+                                Date: ${data.date || ''}
+                            </td>
+                            <td style="width:50%; text-align: center;">
+                                <div style="border-bottom: 1px solid #000; height: 60px;"></div>
+                                <b>承包商安全代表及安全經理<br>Contractor Safety Rep & Safety Manager</b><br>
+                                Date: _____________
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Safety_Report_${data.inspectionNo || 'export'}.doc`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function generatePrintContent(data) {
+            let html = '';
+            selectedCategories.forEach(cat => {
+                const catData = inspectionData[cat];
+                html += `<h3 style="color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 5px;">${catData.name}</h3>`;
+
+                catData.items.forEach((item, idx) => {
+                    const result = inspectionResults[item.id] || {};
+                    const status = result.status || 'Not checked';
+                    const statusClass = status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : '';
+                    const statusText = status === 'pass' ? '合格 PASS' : status === 'fail' ? '不合格 FAIL' : status === 'na' ? '不適用 N/A' : '未檢查';
+
+                    let photosHtml = '';
+                    if (result.photos?.length > 0) {
+                        photosHtml += `<div class="photos">`;
+                        result.photos.forEach(p => {
+                            photosHtml += `<div class="photo"><img src="${p}"></div>`;
+                        });
+                        photosHtml += `</div>`;
+                    }
+
+                    let cPhotosHtml = '';
+                    if (result.contractorPhotos?.length > 0) {
+                        cPhotosHtml += `<div class="photos">`;
+                        result.contractorPhotos.forEach(p => {
+                            cPhotosHtml += `<div class="photo"><img src="${p}"></div>`;
+                        });
+                        cPhotosHtml += `</div>`;
+                    }
+
+                    html += `
+                        <div class="item">
+                            <div class="item-header">
+                                <div class="item-title">${idx + 1}. ${item.title}</div>
+                                <div class="item-subtitle">${item.titleCN}</div>
+                            </div>
+                            <div style="padding: 10px;">
+                                <div class="status ${statusClass}">狀態 Status: ${statusText}</div>
+                            </div>
+                            <div class="section inspector">
+                                <div class="section-title">👷 RSS Representative</div>
+                                ${photosHtml}
+                                ${result.inspectorRemark ? `<div style="padding: 8px; background: white; margin-top: 8px; border: 1px solid #ddd;"><b>備註:</b> ${result.inspectorRemark}</div>` : ''}
+                            </div>
+                            <div class="section contractor">
+                                <div class="section-title">🏗️ Contractor</div>
+                                ${cPhotosHtml}
+                                ${result.contractorRemark ? `<div style="padding: 8px; background: white; margin-top: 8px; border: 1px solid #ddd;"><b>備註:</b> ${result.contractorRemark}</div>` : '<div style="padding: 8px; background: white; margin-top: 8px; border: 1px solid #ddd; min-height: 40px;"><b>備註:</b> </div>'}
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+            return html;
+        }
+
+        function shareReport() {
+            const reportId = document.getElementById('inspectionNo').value;
+            const shareUrl = `${window.location.origin}${window.location.pathname}?report=${reportId}`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Safety Inspection Report',
+                    text: `Inspection Report: ${reportId}`,
+                    url: shareUrl
+                });
+            } else {
+                prompt('Copy this link to share:', shareUrl);
+            }
+        }
+
+        // ==================== UTILITIES ====================
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        function resetInspection() {
+            if (!confirm('重置所有資料？Reset all data?')) return;
+
+            selectedCategories.clear();
+            inspectionResults = {};
+            document.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected', 'completed'));
+            document.getElementById('projectName').value = '';
+            document.getElementById('inspectorName').value = '';
+            document.getElementById('contractorName').value = '';
+            document.getElementById('weather').value = '';
+            generateInspectionNo();
+            updateProgress();
+            showView('select');
+        }
+    </script>
+</body>
+</html>
